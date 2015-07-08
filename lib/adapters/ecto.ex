@@ -77,8 +77,9 @@ defmodule NodeChecker.Adapters.Ecto do
     dead_nodes =
       from(n in CNode,
       where: n.name != ^to_string(state.name),
-      where: fragment("? + (? * INTERVAL '1 millisecond') < ?",
-                      n.updated_at, ^state.gc_window, ^Ecto.DateTime.utc))
+      where: fragment("? + (? * INTERVAL '1 millisecond') <
+                      (NOW() AT TIME ZONE 'utc')::timestamp",
+                      n.updated_at, ^state.gc_window))
       |> repo.delete_all()
       |> case do
         {0, _} -> []
