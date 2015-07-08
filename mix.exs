@@ -14,7 +14,7 @@ defmodule NodeChecker.Mixfile do
   #
   # Type `mix help compile.app` for more information
   def application do
-    [applications: [:logger],
+    [applications: [:logger, :postgrex, :ecto],
      mod: {NodeChecker, []}]
   end
 
@@ -28,6 +28,7 @@ defmodule NodeChecker.Mixfile do
   #
   # Type `mix help deps` for more examples and options
   defp deps do
-    []
+    [{:postgrex, ">= 0.0.0", optional: true},
+     {:ecto, "~> 0.13", optional: true}]
   end
 end
