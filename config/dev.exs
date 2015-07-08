@@ -1,7 +1,6 @@
 use Mix.Config
 
 config :node_checker,
-  heartbeat: 5000,
   adapter: NodeChecker.Adapters.Ecto
 
 config :node_checker, NodeChecker.Adapters.Ecto.Repo,

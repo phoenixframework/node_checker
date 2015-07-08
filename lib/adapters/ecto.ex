@@ -21,8 +21,7 @@ defmodule NodeChecker.Adapters.Ecto do
 
   @server __MODULE__
 
-  @heartbeat Application.get_env(:node_checker, :heartbeat)
-  @gc_window @heartbeat * 2
+  @heartbeat 5000
 
   ## Client API
 
@@ -46,17 +45,20 @@ defmodule NodeChecker.Adapters.Ecto do
   end
 
   def init(opts) do
+    heartbeat  = opts[:heartbeat] || @heartbeat
+    gc_window  = heartbeat * 2
     repo       = opts[:repo] || raise ArgumentError, "Missing required :repo option for Ecto NodeChecker"
     name       = opts[:name] || raise ArgumentError, "Missing required :name option for Ecto NodeChecker"
     local_node = touch_updated_at(repo,
       repo.get_by(CNode, name: to_string(name)) || repo.insert!(%CNode{name: to_string(name)})
     )
 
-    :timer.send_interval(@heartbeat, :heartbeat)
-    :timer.send_interval(@gc_window, :garbage_collect)
+    :timer.send_interval(heartbeat, :heartbeat)
+    :timer.send_interval(gc_window, :garbage_collect)
 
     {:ok, %{nodes: list_nodes(repo, name),
-            heartbeat: @heartbeat,
+            heartbeat: heartbeat,
+            gc_window: gc_window,
             local_node: local_node,
             name: name,
             subscribers: %{},
@@ -75,8 +77,8 @@ defmodule NodeChecker.Adapters.Ecto do
     dead_nodes =
       from(n in CNode,
       where: n.name != ^to_string(state.name),
-      where: fragment("updated_at + INTERVAL '? milliseconds' < ?",
-                      @gc_window, ^Ecto.DateTime.utc))
+      where: fragment("? + (? * INTERVAL '1 millisecond') < ?",
+                      n.updated_at, ^state.gc_window, ^Ecto.DateTime.utc))
       |> repo.delete_all()
       |> case do
         {0, _} -> []

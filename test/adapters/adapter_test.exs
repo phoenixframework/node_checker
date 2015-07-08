@@ -7,7 +7,7 @@ defmodule NodeChecker.AdapterTest do
 
   @adapters %{
     Adapters.Global => [],
-    Adapters.Ecto => [repo: Repo, name: :"ecto@host"],
+    Adapters.Ecto => [repo: Repo, name: :"ecto@host", heartbeat: 45],
   }
 
   defp setup_adapter(Adapters.Ecto, opts) do
