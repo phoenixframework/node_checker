@@ -3,6 +3,7 @@ defmodule NodeChecker.Adapters.Ecto do
   The Repo strategy using Ecto to monitor node events
   """
 
+  @behaviour NodeChecker.Adapter
   use GenServer
   import Ecto.Query
 
@@ -142,12 +143,11 @@ defmodule NodeChecker.Adapters.Ecto do
     %{state | nodes: state.nodes ++ added_nodes}
   end
 
-
   defp list_nodes(repo, own_name) do
-   from(n in CNode,
-   where: n.name != ^to_string(own_name),
-   select: n.name)
-   |> repo.all()
-   |> Enum.map(&String.to_atom(&1))
+    from(n in CNode,
+    where: n.name != ^to_string(own_name),
+    select: n.name)
+    |> repo.all()
+    |> Enum.map(&String.to_atom(&1))
   end
 end

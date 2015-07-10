@@ -3,6 +3,7 @@ defmodule NodeChecker.Adapters.Global do
   The default strategy using :global_group to monitor node events
   """
 
+  @behaviour NodeChecker.Adapter
   use GenServer
 
   @server __MODULE__
