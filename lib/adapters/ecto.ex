@@ -59,7 +59,7 @@ defmodule NodeChecker.Adapters.Ecto do
 
     {:ok, %{nodes: list_nodes(repo, name),
             heartbeat: heartbeat,
-            gc_window: gc_window,
+            gc_window_seconds: window_to_seconds(gc_window),
             local_node: local_node,
             name: name,
             subscribers: %{},
@@ -67,27 +67,19 @@ defmodule NodeChecker.Adapters.Ecto do
   end
 
   def handle_info(:heartbeat, %{repo: repo} = state) do
+    fresh_node_list = list_nodes(repo, state.name)
     {:noreply, state
-               |> remove_nodes(state.nodes -- list_nodes(repo, state.name))
-               |> add_nodes(list_nodes(repo, state.name) -- state.nodes)
+               |> remove_nodes(state.nodes -- fresh_node_list)
+               |> add_nodes(fresh_node_list -- state.nodes)
                |> update_in([:local_node], &touch_updated_at(repo, &1))}
   end
 
   def handle_info(:garbage_collect, %{repo: repo} = state) do
-    # TODO find better way to fetch by interval that is driver agnostic
-    dead_nodes =
-      from(n in CNode,
-      where: n.name != ^to_string(state.name),
-      where: fragment("? + (? * INTERVAL '1 millisecond') <
-                      (NOW() AT TIME ZONE 'utc')::timestamp",
-                      n.updated_at, ^state.gc_window))
-      |> repo.delete_all()
-      |> case do
-        {0, _} -> []
-        {_, _} -> state.nodes -- list_nodes(repo, state.name)
-      end
+    state
+    |> dead_nodes()
+    |> repo.delete_all()
 
-    {:noreply, remove_nodes(state, dead_nodes)}
+    {:noreply, state}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
@@ -149,5 +141,18 @@ defmodule NodeChecker.Adapters.Ecto do
     select: n.name)
     |> repo.all()
     |> Enum.map(&String.to_atom(&1))
+  end
+
+  defp window_to_seconds(ms) do
+    case trunc(ms / 1000) do
+      0 -> 1
+      secs -> secs
+    end
+  end
+
+  defp dead_nodes(%{gc_window_seconds: secs} = state) do
+      from n in CNode,
+    where: n.name != ^to_string(state.name),
+    where: n.updated_at < datetime_add(^Ecto.DateTime.utc, ^-secs, "second")
   end
 end

@@ -97,8 +97,8 @@ defmodule NodeChecker.AdapterTest do
     assert_receive {:nodeup, :"some8@node"}
     assert Adapters.Ecto.list() == [:"some7@node", :"some8@node"]
 
-    assert_receive {:nodedown, :"some7@node"}, 1000
-    assert_receive {:nodedown, :"some8@node"}, 1000
+    assert_receive {:nodedown, :"some7@node"}, 2000
+    assert_receive {:nodedown, :"some8@node"}, 2000
   end
 
   defp simulate_nodeup(Adapters.Global = adapter, node_name) do
