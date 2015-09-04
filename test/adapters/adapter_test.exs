@@ -3,7 +3,7 @@ defmodule NodeChecker.AdapterTest do
   import Ecto.Query
   alias NodeChecker.Adapters
   alias NodeChecker.Adapters.Ecto.CNode
-  alias NodeChecker.Adapters.Ecto.Repo
+  alias NodeChecker.Repo
 
   @adapters %{
     Adapters.Global => [],

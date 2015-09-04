@@ -7,11 +7,6 @@ defmodule NodeChecker.Adapters.Ecto do
   use GenServer
   import Ecto.Query
 
-  # TODO remove stand-in repo
-  defmodule Repo do
-    use Ecto.Repo, otp_app: :node_checker
-  end
-
   defmodule CNode do
     use Ecto.Model
     schema "node_checker_nodes" do
@@ -48,22 +43,34 @@ defmodule NodeChecker.Adapters.Ecto do
   def init(opts) do
     heartbeat  = opts[:heartbeat] || @heartbeat
     gc_window  = heartbeat * 2
-    repo       = opts[:repo] || raise ArgumentError, "Missing required :repo option for Ecto NodeChecker"
-    name       = opts[:name] || raise ArgumentError, "Missing required :name option for Ecto NodeChecker"
-    local_node = touch_updated_at(repo,
-      repo.get_by(CNode, name: to_string(name)) || repo.insert!(%CNode{name: to_string(name)})
-    )
+    repo       = op!(opts, :repo)
+    name       = op!(opts, :name) |> to_string()
+
+    send(self, :setup_nodes)
 
     :timer.send_interval(heartbeat, :heartbeat)
     :timer.send_interval(gc_window, :garbage_collect)
 
-    {:ok, %{nodes: list_nodes(repo, name),
+    {:ok, %{nodes: [],
             heartbeat: heartbeat,
             gc_window_seconds: window_to_seconds(gc_window),
-            local_node: local_node,
+            local_node: nil,
             name: name,
             subscribers: %{},
             repo: repo}}
+  end
+  defp op!(opts, key) do
+    opts[key] || raise(ArgumentError, "Missing required option :#{key} for NodeChecker")
+  end
+
+  def handle_info(:setup_nodes, %{repo: repo, name: name} = state) do
+    local_node = case repo.get_by(CNode, name: name) do
+      %CNode{} = cnode -> touch_updated_at(repo, cnode)
+      nil              -> repo.insert!(%CNode{name: name})
+    end
+
+    {:noreply, %{state | local_node: local_node,
+                         nodes: list_nodes(repo, name)}}
   end
 
   def handle_info(:heartbeat, %{repo: repo} = state) do
@@ -110,7 +117,9 @@ defmodule NodeChecker.Adapters.Ecto do
     do: %{state | subscribers: Map.put(state.subscribers, pid, ref)}
 
   defp touch_updated_at(repo, local_node) do
-    repo.update!(local_node, force: true)
+    # TODO remove hack once bug is fixed in ecto
+    # https://github.com/elixir-lang/ecto/issues/920
+    repo.update!(%CNode{local_node | updated_at: Ecto.DateTime.utc}, force: true)
   end
 
   defp remove_nodes(state, []), do: state
@@ -137,7 +146,7 @@ defmodule NodeChecker.Adapters.Ecto do
 
   defp list_nodes(repo, own_name) do
     from(n in CNode,
-    where: n.name != ^to_string(own_name),
+    where: n.name != ^own_name,
     select: n.name)
     |> repo.all()
     |> Enum.map(&String.to_atom(&1))
@@ -152,7 +161,7 @@ defmodule NodeChecker.Adapters.Ecto do
 
   defp dead_nodes(%{gc_window_seconds: secs} = state) do
       from n in CNode,
-    where: n.name != ^to_string(state.name),
+    where: n.name != ^state.name,
     where: n.updated_at < datetime_add(^Ecto.DateTime.utc, ^-secs, "second")
   end
 end

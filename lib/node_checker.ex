@@ -5,6 +5,8 @@ defmodule NodeChecker do
     import Supervisor.Spec, warn: false
 
     children = [
+      # worker(Repo, [], restart: :transient),
+      # worker(NodeChecker.Adapters.Ecto, [[repo: Repo, name: System.get_env("NODE"), heartbeat: 5000]], restart: :transient)
     ]
 
     opts = [strategy: :one_for_one, name: NodeChecker.Supervisor]
@@ -12,7 +14,7 @@ defmodule NodeChecker do
   end
 
 
- ## Client API
+  ## Client API
 
   def monitor_nodes(pid) do
     adapter().monitor_nodes(pid)
@@ -26,7 +28,7 @@ defmodule NodeChecker do
     adapter().list()
   end
 
-  defp adapter() do
+  def adapter() do
     Application.get_env(:node_checker, :adapter, NodeChecker.Adapters.Global)
   end
 end
